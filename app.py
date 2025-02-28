@@ -3,8 +3,12 @@ import streamlit_lottie as st_lottie
 import requests
 import json
 from streamlit_option_menu import option_menu
-from supabase import create_client
+from supabase_connector import SupabaseConnector
 from streamlit_clerk_auth import authenticate
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Page Configuration
 st.set_page_config(
@@ -174,28 +178,6 @@ def load_css():
         color: white;
     }
     
-    /* Dashboard stats */
-    .dashboard-stat {
-        padding: 1.5rem;
-        background-color: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        backdrop-filter: blur(10px);
-        text-align: center;
-        height: 100%;
-    }
-    
-    .dashboard-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #00A8E8;
-    }
-    
-    .dashboard-label {
-        font-size: 1rem;
-        color: white;
-        opacity: 0.8;
-    }
-    
     /* Animation for cards */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(20px); }
@@ -223,40 +205,6 @@ def load_css():
         color: rgba(255, 255, 255, 0.8);
         margin-bottom: 3rem;
     }
-    
-    /* Profile section styling */
-    .profile-header {
-        display: flex;
-        align-items: center;
-        padding: 1.5rem;
-        background-color: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        backdrop-filter: blur(10px);
-        margin-bottom: 2rem;
-    }
-    
-    .profile-picture {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 3px solid #00A8E8;
-    }
-    
-    .profile-info {
-        margin-left: 1.5rem;
-    }
-    
-    .profile-name {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin-bottom: 0.2rem;
-    }
-    
-    .profile-role {
-        color: #00A8E8;
-        font-size: 1rem;
-    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -271,20 +219,18 @@ def load_lottieurl(url):
     except:
         return None
 
-# Connect to Supabase
+# Connect to database
 @st.cache_resource
-def init_supabase():
-    supabase_url = st.secrets.get("SUPABASE_URL", "your_supabase_url")
-    supabase_key = st.secrets.get("SUPABASE_KEY", "your_supabase_key")
-    return create_client(supabase_url, supabase_key)
+def init_database():
+    return SupabaseConnector()
 
-# Initialize Supabase client
-supabase = init_supabase()
+# Initialize database connector
+db = init_database()
 
 # Apply custom CSS
 load_css()
 
-# Authenticate user with Clerk
+# Authenticate user
 user = authenticate()
 
 if user:
@@ -400,440 +346,41 @@ if user:
             </div>
             """, unsafe_allow_html=True)
         
-        # Featured jobs section
-        st.markdown("<h2 style='text-align: center; margin: 3rem 0 2rem 0;'>Featured Jobs</h2>", unsafe_allow_html=True)
-        
-        # Get featured jobs from Supabase (placeholder - would be actual Supabase query)
-        # featured_jobs = supabase.table("jobs").select("*").eq("featured", True).limit(4).execute()
-        
-        # Sample featured jobs for demonstration
-        featured_jobs = [
-            {
-                "title": "Senior Full Stack Developer", 
-                "company": "TechNova Inc.",
-                "location": "Remote",
-                "job_type": "Full-time",
-                "salary": "$120K - $150K",
-                "description": "Join our team to build innovative solutions for enterprise clients."
-            },
-            {
-                "title": "UX/UI Designer", 
-                "company": "CreativeMinds",
-                "location": "New York, USA",
-                "job_type": "Full-time",
-                "salary": "$90K - $110K",
-                "description": "We're looking for a talented designer to create beautiful interfaces."
-            },
-            {
-                "title": "Data Scientist", 
-                "company": "DataFlow Analytics",
-                "location": "San Francisco, USA",
-                "job_type": "Full-time",
-                "salary": "$130K - $160K",
-                "description": "Build ML models and analyze large datasets to extract valuable insights."
-            },
-            {
-                "title": "DevOps Engineer", 
-                "company": "CloudSphere",
-                "location": "Remote",
-                "job_type": "Contract",
-                "salary": "$100K - $130K",
-                "description": "Improve our cloud infrastructure and implement CI/CD pipelines."
-            }
-        ]
-        
-        # Display featured jobs in a grid
-        col1, col2 = st.columns(2)
-        
-        for i, job in enumerate(featured_jobs):
-            with col1 if i % 2 == 0 else col2:
-                st.markdown(f"""
-                <div class='job-card animated' style='animation-delay: {i*0.1}s'>
-                    <div class='job-title'>{job["title"]}</div>
-                    <div class='company-name'>{job["company"]}</div>
-                    <div class='job-details'>
-                        <span class='detail-item'>{job["location"]}</span>
-                        <span class='detail-item'>{job["job_type"]}</span>
-                        <span class='detail-item'>{job["salary"]}</span>
-                    </div>
-                    <div class='job-description'>{job["description"]}</div>
-                    <button class='apply-button'>View Details</button>
-                </div>
-                """, unsafe_allow_html=True)
-                
-    elif selected == "Jobs":
-        st.markdown("<h1 class='main-title'>Job Listings</h1>", unsafe_allow_html=True)
-        
-        # Search and filter section
-        st.markdown("<div class='search-container'>", unsafe_allow_html=True)
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            search_term = st.text_input("Search jobs", placeholder="Job title, skills, or keywords")
-        
-        with col2:
-            sort_by = st.selectbox("Sort by", ["Newest First", "Salary: High to Low", "Relevance", "Company Rating"])
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            location = st.selectbox("Location", ["Any Location", "Remote", "USA", "Europe", "Asia", "Other"])
-        
-        with col2:
-            job_type = st.selectbox("Job Type", ["Any Type", "Full-time", "Part-time", "Contract", "Internship"])
-        
-        with col3:
-            experience = st.selectbox("Experience Level", ["Any Level", "Entry Level", "Mid Level", "Senior", "Executive"])
-        
-        with col4:
-            salary = st.selectbox("Salary Range", ["Any Range", "Under $50K", "$50K - $100K", "$100K - $150K", "Over $150K"])
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Get jobs from Supabase (placeholder - would be actual Supabase query)
-        # jobs = supabase.table("jobs").select("*").execute()
-        
-        # Sample jobs for demonstration
-        jobs = [
-            {
-                "title": "Senior Full Stack Developer", 
-                "company": "TechNova Inc.",
-                "location": "Remote",
-                "job_type": "Full-time",
-                "salary": "$120K - $150K",
-                "posted": "2 days ago",
-                "description": "Join our team to build innovative solutions for enterprise clients using React, Node.js, and AWS."
-            },
-            {
-                "title": "UX/UI Designer", 
-                "company": "CreativeMinds",
-                "location": "New York, USA",
-                "job_type": "Full-time",
-                "salary": "$90K - $110K",
-                "posted": "5 days ago",
-                "description": "We're looking for a talented designer to create beautiful interfaces. Experience with Figma and design systems required."
-            },
-            {
-                "title": "Data Scientist", 
-                "company": "DataFlow Analytics",
-                "location": "San Francisco, USA",
-                "job_type": "Full-time",
-                "salary": "$130K - $160K",
-                "posted": "1 week ago",
-                "description": "Build ML models and analyze large datasets to extract valuable insights. Strong Python and statistics skills required."
-            },
-            {
-                "title": "DevOps Engineer", 
-                "company": "CloudSphere",
-                "location": "Remote",
-                "job_type": "Contract",
-                "salary": "$100K - $130K",
-                "posted": "2 weeks ago",
-                "description": "Improve our cloud infrastructure and implement CI/CD pipelines. Experience with Kubernetes and AWS required."
-            },
-            {
-                "title": "Product Manager", 
-                "company": "InnovateCorp",
-                "location": "Chicago, USA",
-                "job_type": "Full-time",
-                "salary": "$110K - $140K",
-                "posted": "3 days ago",
-                "description": "Lead product development from concept to launch. Strong communication and analytical skills required."
-            },
-            {
-                "title": "Frontend Developer", 
-                "company": "WebWizards",
-                "location": "Berlin, Germany",
-                "job_type": "Full-time",
-                "salary": "€60K - €80K",
-                "posted": "1 day ago",
-                "description": "Create responsive and interactive web applications using modern JavaScript frameworks like React or Vue."
-            },
-            {
-                "title": "AI Research Scientist", 
-                "company": "Neural Dynamics",
-                "location": "Remote",
-                "job_type": "Full-time",
-                "salary": "$140K - $180K",
-                "posted": "4 days ago",
-                "description": "Conduct cutting-edge research in natural language processing and develop novel ML algorithms."
-            }
-        ]
-        
-        # Display jobs
-        for i, job in enumerate(jobs):
-            st.markdown(f"""
-            <div class='job-card animated' style='animation-delay: {i*0.1}s'>
-                <div class='job-title'>{job["title"]}</div>
-                <div class='company-name'>{job["company"]}</div>
-                <div class='job-details'>
-                    <span class='detail-item'>{job["location"]}</span>
-                    <span class='detail-item'>{job["job_type"]}</span>
-                    <span class='detail-item'>{job["salary"]}</span>
-                    <span class='detail-item'>Posted: {job["posted"]}</span>
-                </div>
-                <div class='job-description'>{job["description"]}</div>
-                <button class='apply-button'>Apply Now</button>
-            </div>
-            """, unsafe_allow_html=True)
-            
-    elif selected == "Companies":
-        st.markdown("<h1 class='main-title'>Top Companies</h1>", unsafe_allow_html=True)
-        
-        # Search and filter
-        search_company = st.text_input("Search companies", placeholder="Company name or industry")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            industry = st.selectbox("Industry", ["All Industries", "Technology", "Healthcare", "Finance", "Education", "Retail"])
-        
-        with col2:
-            company_size = st.selectbox("Company Size", ["Any Size", "Startup (1-50)", "Small (51-200)", "Medium (201-1000)", "Large (1000+)"])
-        
-        with col3:
-            sort_companies = st.selectbox("Sort By", ["Rating", "Most Jobs", "Newest", "Alphabetical"])
-        
-        # Get companies from Supabase (placeholder - would be actual Supabase query)
-        # companies = supabase.table("companies").select("*").execute()
-        
-        # Sample companies for demonstration
-        companies = [
-            {
-                "name": "TechNova Inc.",
-                "industry": "Technology",
-                "location": "San Francisco, USA",
-                "size": "Medium (201-1000)",
-                "rating": "4.8/5",
-                "description": "A leading software development company specializing in enterprise solutions.",
-                "open_jobs": 15
-            },
-            {
-                "name": "DataFlow Analytics",
-                "industry": "Technology",
-                "location": "New York, USA",
-                "size": "Small (51-200)",
-                "rating": "4.6/5",
-                "description": "Data science and analytics company helping businesses leverage their data.",
-                "open_jobs": 8
-            },
-            {
-                "name": "CloudSphere",
-                "industry": "Technology",
-                "location": "Seattle, USA",
-                "size": "Large (1000+)",
-                "rating": "4.5/5",
-                "description": "Cloud infrastructure and services provider with global presence.",
-                "open_jobs": 23
-            },
-            {
-                "name": "HealthPlus",
-                "industry": "Healthcare",
-                "location": "Boston, USA",
-                "size": "Large (1000+)",
-                "rating": "4.4/5",
-                "description": "Healthcare technology company improving patient care through innovation.",
-                "open_jobs": 12
-            },
-            {
-                "name": "CreativeMinds",
-                "industry": "Design",
-                "location": "New York, USA",
-                "size": "Small (51-200)",
-                "rating": "4.7/5",
-                "description": "Award-winning design agency creating digital experiences for global brands.",
-                "open_jobs": 5
-            },
-            {
-                "name": "GreenEnergy Solutions",
-                "industry": "Energy",
-                "location": "Austin, USA",
-                "size": "Medium (201-1000)",
-                "rating": "4.3/5",
-                "description": "Sustainable energy company developing renewable energy technologies.",
-                "open_jobs": 9
-            }
-        ]
-        
-        # Display companies in a grid
-        col1, col2 = st.columns(2)
-        
-        for i, company in enumerate(companies):
-            with col1 if i % 2 == 0 else col2:
-                st.markdown(f"""
-                <div class='card animated' style='animation-delay: {i*0.1}s'>
-                    <h2>{company["name"]}</h2>
-                    <div style='margin-bottom: 1rem;'>
-                        <span style='color: #00A8E8;'>{company["industry"]}</span> | {company["location"]} | {company["size"]}
-                    </div>
-                    <div style='display: flex; justify-content: space-between; margin-bottom: 1rem;'>
-                        <span>⭐ {company["rating"]}</span>
-                        <span>{company["open_jobs"]} open positions</span>
-                    </div>
-                    <p>{company["description"]}</p>
-                    <button class='apply-button' style='width: 100%;'>View Company</button>
-                </div>
-                """, unsafe_allow_html=True)
-                
-    elif selected == "Applications" and st.session_state.user_role == "jobseeker":
-        st.markdown("<h1 class='main-title'>My Applications</h1>", unsafe_allow_html=True)
-        
-        # Tabs for different application statuses
-        tab1, tab2, tab3, tab4 = st.tabs(["All Applications", "In Progress", "Interviews", "Rejected"])
-        
-        # Get applications from Supabase (placeholder - would be actual Supabase query)
-        # applications = supabase.table("applications").select("*").eq("user_id", st.session_state.user_id).execute()
-        
-        # Sample applications for demonstration
-        applications = [
-            {
-                "job_title": "Senior Full Stack Developer",
-                "company": "TechNova Inc.",
-                "applied_date": "2023-02-15",
-                "status": "Interview Scheduled",
-                "next_step": "Technical Interview on March 5, 2023"
-            },
-            {
-                "job_title": "UX/UI Designer",
-                "company": "CreativeMinds",
-                "applied_date": "2023-02-10",
-                "status": "Application Review",
-                "next_step": "Waiting for feedback"
-            },
-            {
-                "job_title": "Product Manager",
-                "company": "InnovateCorp",
-                "applied_date": "2023-02-01",
-                "status": "Rejected",
-                "next_step": "Try other opportunities"
-            },
-            {
-                "job_title": "Frontend Developer",
-                "company": "WebWizards",
-                "applied_date": "2023-02-18",
-                "status": "Application Submitted",
-                "next_step": "Waiting for review"
-            }
-        ]
-        
-        # All Applications tab
-        with tab1:
-            for app in applications:
-                status_color = "#00A8E8" if app["status"] == "Interview Scheduled" else "#FFA500" if app["status"] == "Application Review" or app["status"] == "Application Submitted" else "#FF6347"
-                
-                st.markdown(f"""
-                <div class='card animated'>
-                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;'>
-                        <h3 style='margin: 0;'>{app["job_title"]}</h3>
-                        <span style='color: {status_color}; font-weight: 600;'>{app["status"]}</span>
-                    </div>
-                    <div style='margin-bottom: 0.5rem;'>{app["company"]} | Applied on {app["applied_date"]}</div>
-                    <div>Next step: {app["next_step"]}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Filtered tabs
-        with tab2:
-            in_progress = [app for app in applications if app["status"] in ["Application Review", "Application Submitted"]]
-            if in_progress:
-                for app in in_progress:
-                    st.markdown(f"""
-                    <div class='card animated'>
-                        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;'>
-                            <h3 style='margin: 0;'>{app["job_title"]}</h3>
-                            <span style='color: #FFA500; font-weight: 600;'>{app["status"]}</span>
-                        </div>
-                        <div style='margin-bottom: 0.5rem;'>{app["company"]} | Applied on {app["applied_date"]}</div>
-                        <div>Next step: {app["next_step"]}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info("No applications in progress")
-        
-        with tab3:
-            interviews = [app for app in applications if app["status"] == "Interview Scheduled"]
-            if interviews:
-                for app in interviews:
-                    st.markdown(f"""
-                    <div class='card animated'>
-                        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;'>
-                            <h3 style='margin: 0;'>{app["job_title"]}</h3>
-                            <span style='color: #00A8E8; font-weight: 600;'>{app["status"]}</span>
-                        </div>
-                        <div style='margin-bottom: 0.5rem;'>{app["company"]} | Applied on {app["applied_date"]}</div>
-                        <div>Next step: {app["next_step"]}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info("No upcoming interviews")
-        
-        with tab4:
-            rejected = [app for app in applications if app["status"] == "Rejected"]
-            if rejected:
-                for app in rejected:
-                    st.markdown(f"""
-                    <div class='card animated'>
-                        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;'>
-                            <h3 style='margin: 0;'>{app["job_title"]}</h3>
-                            <span style='color: #FF6347; font-weight: 600;'>{app["status"]}</span>
-                        </div>
-                        <div style='margin-bottom: 0.5rem;'>{app["company"]} | Applied on {app["applied_date"]}</div>
-                        <div>Next step: {app["next_step"]}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info("No rejected applications")
-    
-    elif selected == "Dashboard" and st.session_state.user_role != "jobseeker":
-        st.markdown("<h1 class='main-title'>Employer Dashboard</h1>", unsafe_allow_html=True)
-        
-        # Dashboard metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("""
-            <div class='dashboard-stat'>
-                <div class='dashboard-value'>12</div>
-                <div class='dashboard-label'>Active Jobs</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col2:
-            st.markdown("""
-            <div class='dashboard-stat'>
-                <div class='dashboard-value'>143</div>
-                <div class='dashboard-label'>Applications</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col3:
-            st.markdown("""
-            <div class='dashboard-stat'>
-                <div class='dashboard-value'>28</div>
-                <div class='dashboard-label'>Interviews</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col4:
-            st.markdown("""
-            <div class='dashboard-stat'>
-                <div class='dashboard-value'>8</div>
-                <div class='dashboard-label'>Hires</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
         # Tabs for different dashboard sections
         tab1, tab2, tab3 = st.tabs(["Posted Jobs", "Applications", "Candidates"])
         
         with tab1:
-            # Posted jobs section
-            st.subheader("Your Job Listings")
+            # Sample employer job listings (would be from database in production)
+            employer_jobs = [
+                {
+                    "id": 1,
+                    "title": "Senior Full Stack Developer",
+                    "posted_date": "2023-02-01",
+                    "applications": 45,
+                    "status": "Active",
+                    "views": 320
+                },
+                {
+                    "id": 2,
+                    "title": "UX/UI Designer",
+                    "posted_date": "2023-02-10",
+                    "applications": 28,
+                    "status": "Active",
+                    "views": 215
+                },
+                {
+                    "id": 3,
+                    "title": "Project Manager",
+                    "posted_date": "2023-01-15",
+                    "applications": 52,
+                    "status": "Closed",
+                    "views": 410
+                }
+            ]
             
             # Add new job button
-            col1, col2 = st.columns([3, 1])
-            with col2:
-                if st.button("+ Post New Job", use_container_width=True):
-                    st.session_state.show_job_form = True
+            if st.button("+ Post New Job", use_container_width=True):
+                st.session_state.show_job_form = True
             
             # Show job form if button clicked
             if st.session_state.get("show_job_form", False):
@@ -860,18 +407,7 @@ if user:
                         submit = st.form_submit_button("Create Job")
                     
                     if submit:
-                        # Would insert into Supabase here
-                        # supabase.table("jobs").insert({
-                        #     "title": job_title,
-                        #     "description": job_description,
-                        #     "location": job_location,
-                        #     "job_type": job_type,
-                        #     "salary_range": salary_range,
-                        #     "experience_level": experience_level,
-                        #     "employer_id": st.session_state.user_id,
-                        #     "created_at": "now()"
-                        # }).execute()
-                        st.success("Job posted successfully!")
+                        st.success("Job posted successfully! (Demo mode)")
                         st.session_state.show_job_form = False
                         st.rerun()
                     
@@ -879,42 +415,7 @@ if user:
                         st.session_state.show_job_form = False
                         st.rerun()
             
-            # Sample employer job listings
-            employer_jobs = [
-                {
-                    "id": 1,
-                    "title": "Senior Full Stack Developer",
-                    "posted_date": "2023-02-01",
-                    "applications": 45,
-                    "status": "Active",
-                    "views": 320
-                },
-                {
-                    "id": 2,
-                    "title": "UX/UI Designer",
-                    "posted_date": "2023-02-10",
-                    "applications": 28,
-                    "status": "Active",
-                    "views": 215
-                },
-                {
-                    "id": 3,
-                    "title": "Project Manager",
-                    "posted_date": "2023-01-15",
-                    "applications": 52,
-                    "status": "Closed",
-                    "views": 410
-                },
-                {
-                    "id": 4,
-                    "title": "Marketing Specialist",
-                    "posted_date": "2023-02-20",
-                    "applications": 18,
-                    "status": "Active",
-                    "views": 130
-                }
-            ]
-            
+            # Display job listings
             for job in employer_jobs:
                 col1, col2 = st.columns([3, 1])
                 
@@ -932,174 +433,28 @@ if user:
                     st.button("View Details", key=f"view_job_{job['id']}")
                     st.button("Edit Job", key=f"edit_job_{job['id']}")
                     st.markdown("</div>", unsafe_allow_html=True)
-        
-        with tab2:
-            # Applications management
-            st.subheader("Recent Applications")
-            
-            # Filter options
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                job_filter = st.selectbox("Filter by Job", ["All Jobs", "Senior Full Stack Developer", "UX/UI Designer", "Project Manager", "Marketing Specialist"])
-            with col2:
-                status_filter = st.selectbox("Filter by Status", ["All Statuses", "New", "Reviewed", "Interview", "Rejected", "Hired"])
-            with col3:
-                date_filter = st.selectbox("Filter by Date", ["All Time", "Today", "This Week", "This Month"])
-            
-            # Sample applications data
-            applications = [
-                {
-                    "id": 1,
-                    "candidate_name": "John Smith",
-                    "job_title": "Senior Full Stack Developer",
-                    "applied_date": "2023-02-18",
-                    "status": "Interview",
-                    "resume": "https://example.com/resume1.pdf"
-                },
-                {
-                    "id": 2,
-                    "candidate_name": "Emily Johnson",
-                    "job_title": "UX/UI Designer",
-                    "applied_date": "2023-02-17",
-                    "status": "New",
-                    "resume": "https://example.com/resume2.pdf"
-                },
-                {
-                    "id": 3,
-                    "candidate_name": "Michael Brown",
-                    "job_title": "Project Manager",
-                    "applied_date": "2023-02-15",
-                    "status": "Reviewed",
-                    "resume": "https://example.com/resume3.pdf"
-                },
-                {
-                    "id": 4,
-                    "candidate_name": "Sarah Williams",
-                    "job_title": "Senior Full Stack Developer",
-                    "applied_date": "2023-02-10",
-                    "status": "Rejected",
-                    "resume": "https://example.com/resume4.pdf"
-                },
-                {
-                    "id": 5,
-                    "candidate_name": "David Lee",
-                    "job_title": "Marketing Specialist",
-                    "applied_date": "2023-02-20",
-                    "status": "New",
-                    "resume": "https://example.com/resume5.pdf"
-                }
-            ]
-            
-            # Display applications in a table-like format
-            for app in applications:
-                status_color = "#00A8E8" if app["status"] == "Interview" else "#4CAF50" if app["status"] == "Hired" else "#FFA500" if app["status"] == "New" or app["status"] == "Reviewed" else "#FF6347"
-                
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    st.markdown(f"""
-                    <div class='card'>
-                        <h3>{app["candidate_name"]}</h3>
-                        <div>Applied for: {app["job_title"]} | Date: {app["applied_date"]}</div>
-                        <div style='margin-top: 0.5rem;'>Status: <span style='color: {status_color};'>{app["status"]}</span></div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col2:
-                    st.markdown("<div style='height: 100%; display: flex; flex-direction: column; justify-content: center;'>", unsafe_allow_html=True)
-                    st.button("View Profile", key=f"view_app_{app['id']}")
-                    st.button("Change Status", key=f"status_app_{app['id']}")
-                    st.markdown("</div>", unsafe_allow_html=True)
-        
-        with tab3:
-            # Candidate tracking
-            st.subheader("Talent Pool")
-            
-            # Search candidates
-            search_candidates = st.text_input("Search candidates", placeholder="Name or skills")
-            
-            # Sample candidates
-            candidates = [
-                {
-                    "id": 1,
-                    "name": "John Smith",
-                    "title": "Senior Developer",
-                    "skills": ["React", "Node.js", "AWS", "Python"],
-                    "experience": "8 years",
-                    "location": "New York, USA",
-                    "status": "Active"
-                },
-                {
-                    "id": 2,
-                    "name": "Emily Johnson",
-                    "title": "UX/UI Designer",
-                    "skills": ["Figma", "Adobe XD", "Sketch", "CSS"],
-                    "experience": "5 years",
-                    "location": "San Francisco, USA",
-                    "status": "Interviewing"
-                },
-                {
-                    "id": 3,
-                    "name": "Michael Brown",
-                    "title": "Project Manager",
-                    "skills": ["Agile", "Scrum", "JIRA", "Product Management"],
-                    "experience": "10 years",
-                    "location": "Chicago, USA",
-                    "status": "Contacted"
-                },
-                {
-                    "id": 4,
-                    "name": "Sarah Williams",
-                    "title": "Full Stack Developer",
-                    "skills": ["JavaScript", "React", "MongoDB", "Express"],
-                    "experience": "4 years",
-                    "location": "Remote",
-                    "status": "New"
-                }
-            ]
-            
-            # Display candidates in a grid
-            col1, col2 = st.columns(2)
-            
-            for i, candidate in enumerate(candidates):
-                with col1 if i % 2 == 0 else col2:
-                    skills_html = " ".join([f"<span style='background-color: rgba(0, 168, 232, 0.2); padding: 3px 8px; border-radius: 12px; margin-right: 5px; font-size: 0.8rem;'>{skill}</span>" for skill in candidate["skills"]])
-                    
-                    status_color = "#00A8E8" if candidate["status"] == "Interviewing" else "#4CAF50" if candidate["status"] == "Active" else "#FFA500" if candidate["status"] == "Contacted" else "#6c757d"
-                    
-                    st.markdown(f"""
-                    <div class='card'>
-                        <div style='display: flex; justify-content: space-between; align-items: center;'>
-                            <h3>{candidate["name"]}</h3>
-                            <span style='color: {status_color}; font-weight: 600;'>{candidate["status"]}</span>
-                        </div>
-                        <div style='margin-bottom: 0.5rem;'>{candidate["title"]} | {candidate["experience"]} | {candidate["location"]}</div>
-                        <div style='margin-bottom: 0.5rem;'>{skills_html}</div>
-                        <div style='display: flex; gap: 10px; margin-top: 10px;'>
-                            <button style='background-color: #00A8E8; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;'>View Profile</button>
-                            <button style='background-color: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;'>Contact</button>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
     
     elif selected == "Profile":
         st.markdown("<h1 class='main-title'>My Profile</h1>", unsafe_allow_html=True)
         
-        # Profile header with user info
-        st.markdown(f"""
-        <div class='profile-header'>
-            <img src="https://via.placeholder.com/150" class="profile-picture">
-            <div class='profile-info'>
-                <div class='profile-name'>{st.session_state.user_name}</div>
-                <div class='profile-role'>{st.session_state.user_role.capitalize()}</div>
-                <div style='margin-top: 5px;'>{st.session_state.user_email}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Get user profile (would be from database in production)
+        if db.is_connected():
+            profile = db.get_user_profile(st.session_state.user_id)
+        else:
+            # Mock profile data
+            profile = {
+                "first_name": st.session_state.user_name.split(" ")[0],
+                "last_name": st.session_state.user_name.split(" ")[-1] if len(st.session_state.user_name.split(" ")) > 1 else "",
+                "email": st.session_state.user_email,
+                "phone": "+1 555-123-4567",
+                "city": "New York",
+                "country": "USA",
+                "role": st.session_state.user_role
+            }
         
         # Tabs for different profile sections
         if st.session_state.user_role == "jobseeker":
-            tab1, tab2, tab3, tab4 = st.tabs(["Personal Info", "Resume", "Job Preferences", "Account Settings"])
+            tab1, tab2, tab3 = st.tabs(["Personal Info", "Resume", "Job Preferences"])
             
             with tab1:
                 # Personal information form
@@ -1108,18 +463,19 @@ if user:
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        first_name = st.text_input("First Name", value="John")
-                        phone = st.text_input("Phone Number", value="+1 123-456-7890")
-                        city = st.text_input("City", value="New York")
+                        first_name = st.text_input("First Name", value=profile.get("first_name", ""))
+                        phone = st.text_input("Phone Number", value=profile.get("phone", ""))
+                        city = st.text_input("City", value=profile.get("city", ""))
                     
                     with col2:
-                        last_name = st.text_input("Last Name", value="Smith")
-                        website = st.text_input("Website/Portfolio", value="https://johnsmith.dev")
+                        last_name = st.text_input("Last Name", value=profile.get("last_name", ""))
+                        website = st.text_input("Website/Portfolio", value=profile.get("website", ""))
                         country = st.selectbox("Country", ["United States", "Canada", "United Kingdom", "Germany", "Australia"])
                     
-                    about_me = st.text_area("About Me", value="Experienced software developer with a passion for creating clean, efficient, and user-friendly applications. Specialized in full-stack development with expertise in React, Node.js, and cloud technologies.")
+                    about_me = st.text_area("About Me", value=profile.get("about", ""))
                     
-                    st.form_submit_button("Save Changes")
+                    if st.form_submit_button("Save Changes"):
+                        st.success("Profile updated successfully! (Demo mode)")
             
             with tab2:
                 # Resume section
@@ -1129,85 +485,7 @@ if user:
                 uploaded_file = st.file_uploader("Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
                 
                 if uploaded_file is not None:
-                    st.success("Resume uploaded successfully!")
-                
-                # Experience section
-                st.subheader("Work Experience")
-                
-                # Sample experience
-                experiences = [
-                    {
-                        "title": "Senior Developer",
-                        "company": "TechSolutions Inc.",
-                        "duration": "Jan 2020 - Present",
-                        "description": "Leading the development of web applications using React and Node.js. Managing a team of 5 developers."
-                    },
-                    {
-                        "title": "Frontend Developer",
-                        "company": "WebInnovate",
-                        "duration": "Mar 2017 - Dec 2019",
-                        "description": "Developed responsive web interfaces using React and Redux. Collaborated with designers and backend developers."
-                    }
-                ]
-                
-                for exp in experiences:
-                    with st.expander(f"{exp['title']} at {exp['company']}"):
-                        col1, col2, col3 = st.columns([3, 2, 1])
-                        with col1:
-                            job_title = st.text_input("Job Title", value=exp["title"], key=f"title_{exp['company']}")
-                        with col2:
-                            company = st.text_input("Company", value=exp["company"], key=f"company_{exp['company']}")
-                        with col3:
-                            duration = st.text_input("Duration", value=exp["duration"], key=f"duration_{exp['company']}")
-                        
-                        description = st.text_area("Description", value=exp["description"], key=f"desc_{exp['company']}")
-                        
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            st.button("Update", key=f"update_{exp['company']}")
-                        with col2:
-                            st.button("Delete", key=f"delete_{exp['company']}")
-                
-                # Add new experience button
-                if st.button("+ Add Experience"):
-                    st.info("Add new experience functionality would be implemented here")
-                
-                # Education section
-                st.subheader("Education")
-                
-                # Sample education
-                education = [
-                    {
-                        "degree": "Master of Computer Science",
-                        "institution": "University of Technology",
-                        "years": "2015 - 2017"
-                    },
-                    {
-                        "degree": "Bachelor of Science in Computer Science",
-                        "institution": "State University",
-                        "years": "2011 - 2015"
-                    }
-                ]
-                
-                for edu in education:
-                    with st.expander(f"{edu['degree']} - {edu['institution']}"):
-                        col1, col2, col3 = st.columns([3, 3, 2])
-                        with col1:
-                            degree = st.text_input("Degree", value=edu["degree"], key=f"degree_{edu['institution']}")
-                        with col2:
-                            institution = st.text_input("Institution", value=edu["institution"], key=f"inst_{edu['institution']}")
-                        with col3:
-                            years = st.text_input("Years", value=edu["years"], key=f"years_{edu['institution']}")
-                        
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            st.button("Update", key=f"update_edu_{edu['institution']}")
-                        with col2:
-                            st.button("Delete", key=f"delete_edu_{edu['institution']}")
-                
-                # Add new education button
-                if st.button("+ Add Education"):
-                    st.info("Add new education functionality would be implemented here")
+                    st.success("Resume uploaded successfully! (Demo mode)")
                 
                 # Skills section
                 st.subheader("Skills")
@@ -1259,55 +537,10 @@ if user:
                         value="$100K - $120K"
                     )
                 
-                relocation = st.checkbox("Open to relocation")
-                travel = st.checkbox("Willing to travel")
-                
-                st.text_area("Additional Preferences", placeholder="Any other job preferences you'd like employers to know")
-                
                 st.button("Save Preferences")
-            
-            with tab4:
-                # Account settings
-                st.subheader("Account Settings")
-                
-                # Password change
-                with st.expander("Change Password"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        current_password = st.text_input("Current Password", type="password")
-                    with col2:
-                        new_password = st.text_input("New Password", type="password")
-                    
-                    confirm_password = st.text_input("Confirm New Password", type="password")
-                    
-                    st.button("Update Password")
-                
-                # Email notifications
-                with st.expander("Email Notifications"):
-                    st.checkbox("Job recommendations", value=True)
-                    st.checkbox("Application updates", value=True)
-                    st.checkbox("Profile views", value=False)
-                    st.checkbox("Job alerts based on preferences", value=True)
-                    
-                    st.button("Save Notification Settings")
-                
-                # Privacy settings
-                with st.expander("Privacy Settings"):
-                    st.checkbox("Make profile visible to employers", value=True)
-                    st.checkbox("Allow employers to contact me", value=True)
-                    st.checkbox("Show salary expectations on profile", value=False)
-                    
-                    st.button("Save Privacy Settings")
-                
-                # Account deletion
-                with st.expander("Delete Account"):
-                    st.warning("Warning: Deleting your account will permanently remove all your data. This action cannot be undone.")
-                    st.text_input("Type 'DELETE' to confirm", placeholder="DELETE")
-                    
-                    st.button("Delete My Account", type="primary", help="This action is irreversible")
         else:
             # Employer profile
-            tab1, tab2, tab3 = st.tabs(["Company Profile", "Job Postings", "Account Settings"])
+            tab1, tab2 = st.tabs(["Company Profile", "Job Postings"])
             
             with tab1:
                 # Company profile form
@@ -1328,156 +561,10 @@ if user:
                         website = st.text_input("Company Website", value="https://technova.example.com")
                         founded_year = st.number_input("Year Founded", min_value=1900, max_value=2023, value=2010)
                     
-                    company_description = st.text_area("Company Description", value="TechNova is a leading software development company specializing in innovative enterprise solutions. We create cutting-edge applications that help businesses streamline operations and enhance customer experiences.")
+                    company_description = st.text_area("Company Description", value="TechNova is a leading software development company specializing in innovative enterprise solutions.")
                     
-                    st.subheader("Location")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        address = st.text_input("Address", value="123 Tech Boulevard")
-                        city = st.text_input("City", value="San Francisco")
-                    
-                    with col2:
-                        state = st.text_input("State/Province", value="California")
-                        country = st.selectbox("Country", ["United States", "Canada", "United Kingdom", "Germany", "Australia"])
-                    
-                    st.form_submit_button("Save Company Profile")
-            
-            with tab2:
-                st.subheader("Active Job Postings")
-                
-                # Job posting stats
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Active Jobs", "12")
-                with col2:
-                    st.metric("Applications Received", "143", "+28")
-                with col3:
-                    st.metric("Jobs Filled", "8", "+2")
-                
-                # Job listings
-                active_jobs = [
-                    {
-                        "id": 1,
-                        "title": "Senior Full Stack Developer",
-                        "posted_date": "2023-02-01",
-                        "expiry_date": "2023-03-01",
-                        "applications": 45,
-                        "status": "Active"
-                    },
-                    {
-                        "id": 2,
-                        "title": "UX/UI Designer",
-                        "posted_date": "2023-02-10",
-                        "expiry_date": "2023-03-10",
-                        "applications": 28,
-                        "status": "Active"
-                    },
-                    {
-                        "id": 4,
-                        "title": "Marketing Specialist",
-                        "posted_date": "2023-02-20",
-                        "expiry_date": "2023-03-20",
-                        "applications": 18,
-                        "status": "Active"
-                    }
-                ]
-                
-                for job in active_jobs:
-                    st.markdown(f"""
-                    <div class='card animated'>
-                        <h3>{job["title"]}</h3>
-                        <div>Posted: {job["posted_date"]} | Expires: {job["expiry_date"]}</div>
-                        <div style='margin-top: 0.5rem;'>{job["applications"]} applications received</div>
-                        <div style='display: flex; gap: 10px; margin-top: 10px;'>
-                            <button style='background-color: #00A8E8; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;'>View Applications</button>
-                            <button style='background-color: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;'>Edit Job</button>
-                            <button style='background-color: rgba(255, 0, 0, 0.2); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;'>Close Job</button>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.button("+ Post New Job")
-            
-            with tab3:
-                # Account settings
-                st.subheader("Account Settings")
-                
-                # Subscription plan
-                st.markdown("""
-                <div class='card'>
-                    <h3>Current Plan: Business Pro</h3>
-                    <div>Active until: March 15, 2023</div>
-                    <div style='margin-top: 1rem;'>
-                        <span style='background-color: rgba(0, 168, 232, 0.2); padding: 5px 10px; border-radius: 5px; margin-right: 10px;'>Unlimited job postings</span>
-                        <span style='background-color: rgba(0, 168, 232, 0.2); padding: 5px 10px; border-radius: 5px; margin-right: 10px;'>Featured listings</span>
-                        <span style='background-color: rgba(0, 168, 232, 0.2); padding: 5px 10px; border-radius: 5px; margin-right: 10px;'>Advanced analytics</span>
-                    </div>
-                    <div style='margin-top: 1rem;'>
-                        <button style='background-color: #00A8E8; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer;'>Upgrade Plan</button>
-                        <button style='background-color: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; margin-left: 10px;'>Billing History</button>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Company users
-                st.subheader("Company Users")
-                
-                # Sample users
-                company_users = [
-                    {
-                        "name": "John Smith",
-                        "email": "john@technova.example.com",
-                        "role": "Admin",
-                        "last_active": "Today"
-                    },
-                    {
-                        "name": "Sarah Johnson",
-                        "email": "sarah@technova.example.com",
-                        "role": "Recruiter",
-                        "last_active": "Yesterday"
-                    },
-                    {
-                        "name": "Michael Brown",
-                        "email": "michael@technova.example.com",
-                        "role": "Hiring Manager",
-                        "last_active": "3 days ago"
-                    }
-                ]
-                
-                for user in company_users:
-                    st.markdown(f"""
-                    <div class='card'>
-                        <div style='display: flex; justify-content: space-between; align-items: center;'>
-                            <div>
-                                <h3>{user["name"]}</h3>
-                                <div>{user["email"]}</div>
-                                <div style='margin-top: 0.5rem;'>Role: {user["role"]} | Last active: {user["last_active"]}</div>
-                            </div>
-                            <div>
-                                <button style='background-color: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;'>Edit</button>
-                                <button style='background-color: rgba(255, 0, 0, 0.2); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-left: 5px;'>Remove</button>
-                            </div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                if st.button("+ Add Team Member"):
-                    st.info("Invite team member functionality would be implemented here")
-                
-                # Company settings
-                with st.expander("Email Settings"):
-                    st.checkbox("New application notifications", value=True)
-                    st.checkbox("Daily application summary", value=True)
-                    st.checkbox("Job posting expiry reminders", value=True)
-                    
-                    st.button("Save Email Settings")
-                
-                # API access
-                with st.expander("API Access"):
-                    st.text("API Key: ********-****-****-****-************")
-                    st.button("Generate New API Key")
-                    st.markdown("Use our API to integrate job postings with your company website or ATS.")
+                    if st.form_submit_button("Save Company Profile"):
+                        st.success("Company profile updated successfully! (Demo mode)")
 else:
     # User is not authenticated
     st.markdown("<h1 class='main-title'>Welcome to JobWave</h1>", unsafe_allow_html=True)
@@ -1491,7 +578,7 @@ else:
         st.markdown("""
         <div class='card'>
             <h2>Sign In to Get Started</h2>
-            <p>Please use Clerk authentication to sign in or create an account.</p>
+            <p>Please use authentication to sign in or create an account.</p>
             <p>Choose your role when signing up:</p>
             <ul>
                 <li>Job Seeker - Find jobs and manage applications</li>
@@ -1518,11 +605,8 @@ else:
         lottie_json = load_lottieurl(lottie_url)
         if lottie_json:
             st_lottie.st_lottie(lottie_json, height=400)
-        
-        # Login/Sign up prompt
-        st.markdown("""
-        <div class='card' style='text-align: center;'>
-            <h3>Ready to start your journey?</h3>
-            <p>Sign in with Clerk to access all features</p>
-        </div>
-        """, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    # This will run when the script is executed directly
+    # Can be used for initialization if needed
+    pass
