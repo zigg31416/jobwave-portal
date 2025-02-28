@@ -2,6 +2,6 @@ streamlit
 supabase
 streamlit_lottie
 streamlit_option_menu
-request
+requests
 python-dotenv
 pillow
