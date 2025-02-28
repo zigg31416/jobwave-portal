@@ -1,15 +1,31 @@
 import streamlit as st
-from supabase import create_client
+from supabase import create_client, Client
 from typing import Dict, List, Any, Optional, Union
+import logging
 
 class SupabaseConnector:
     """Class to handle Supabase database operations for the job portal."""
     
     def __init__(self):
         """Initialize the Supabase client."""
-        self.supabase_url = st.secrets.get("SUPABASE_URL", "your_supabase_url")
-        self.supabase_key = st.secrets.get("SUPABASE_KEY", "your_supabase_key")
-        self.client = create_client(self.supabase_url, self.supabase_key)
+        try:
+            self.supabase_url = st.secrets.get("SUPABASE_URL", "")
+            self.supabase_key = st.secrets.get("SUPABASE_KEY", "")
+            
+            if not self.supabase_url or not self.supabase_key:
+                st.warning("Supabase credentials not found in secrets. Using mock data.")
+                self.client = None
+            else:
+                self.client = create_client(self.supabase_url, self.supabase_key)
+                
+        except Exception as e:
+            logging.error(f"Error initializing Supabase client: {str(e)}")
+            st.error(f"Error connecting to database. Using mock data instead.")
+            self.client = None
+    
+    def is_connected(self) -> bool:
+        """Check if connected to Supabase."""
+        return self.client is not None
     
     # User operations
     def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -22,11 +38,26 @@ class SupabaseConnector:
         Returns:
             The user profile or None if not found
         """
+        if not self.is_connected():
+            # Return mock data
+            return {
+                "user_id": user_id,
+                "first_name": "Demo",
+                "last_name": "User",
+                "email": "demo@example.com",
+                "phone": "+1 555-123-4567",
+                "city": "New York",
+                "country": "USA",
+                "about": "This is a demo profile as the database connection is not available.",
+                "website": "https://example.com",
+                "role": "jobseeker"
+            }
+            
         try:
             response = self.client.table("profiles").select("*").eq("user_id", user_id).single().execute()
             return response.data if response.data else None
         except Exception as e:
-            st.error(f"Error fetching user profile: {str(e)}")
+            logging.error(f"Error fetching user profile: {str(e)}")
             return None
     
     def create_user_profile(self, profile_data: Dict[str, Any]) -> bool:
@@ -39,29 +70,15 @@ class SupabaseConnector:
         Returns:
             True if successful, False otherwise
         """
+        if not self.is_connected():
+            # Simulate success for demo
+            return True
+            
         try:
             self.client.table("profiles").insert(profile_data).execute()
             return True
         except Exception as e:
-            st.error(f"Error creating user profile: {str(e)}")
-            return False
-    
-    def update_user_profile(self, user_id: str, profile_data: Dict[str, Any]) -> bool:
-        """
-        Update a user's profile.
-        
-        Args:
-            user_id: The user's ID
-            profile_data: The profile data to update
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.client.table("profiles").update(profile_data).eq("user_id", user_id).execute()
-            return True
-        except Exception as e:
-            st.error(f"Error updating user profile: {str(e)}")
+            logging.error(f"Error creating user profile: {str(e)}")
             return False
     
     # Job operations
@@ -76,6 +93,61 @@ class SupabaseConnector:
         Returns:
             List of jobs
         """
+        if not self.is_connected():
+            # Return mock data
+            return [
+                {
+                    "id": "1",
+                    "title": "Senior Full Stack Developer", 
+                    "company": "TechNova Inc.",
+                    "location": "Remote",
+                    "job_type": "Full-time",
+                    "salary": "$120K - $150K",
+                    "posted": "2 days ago",
+                    "description": "Join our team to build innovative solutions for enterprise clients using React, Node.js, and AWS."
+                },
+                {
+                    "id": "2",
+                    "title": "UX/UI Designer", 
+                    "company": "CreativeMinds",
+                    "location": "New York, USA",
+                    "job_type": "Full-time",
+                    "salary": "$90K - $110K",
+                    "posted": "5 days ago",
+                    "description": "We're looking for a talented designer to create beautiful interfaces. Experience with Figma and design systems required."
+                },
+                {
+                    "id": "3",
+                    "title": "Data Scientist", 
+                    "company": "DataFlow Analytics",
+                    "location": "San Francisco, USA",
+                    "job_type": "Full-time",
+                    "salary": "$130K - $160K",
+                    "posted": "1 week ago",
+                    "description": "Build ML models and analyze large datasets to extract valuable insights. Strong Python and statistics skills required."
+                },
+                {
+                    "id": "4",
+                    "title": "DevOps Engineer", 
+                    "company": "CloudSphere",
+                    "location": "Remote",
+                    "job_type": "Contract",
+                    "salary": "$100K - $130K",
+                    "posted": "2 weeks ago",
+                    "description": "Improve our cloud infrastructure and implement CI/CD pipelines. Experience with Kubernetes and AWS required."
+                },
+                {
+                    "id": "5",
+                    "title": "Product Manager", 
+                    "company": "InnovateCorp",
+                    "location": "Chicago, USA",
+                    "job_type": "Full-time",
+                    "salary": "$110K - $140K",
+                    "posted": "3 days ago",
+                    "description": "Lead product development from concept to launch. Strong communication and analytical skills required."
+                }
+            ]
+            
         try:
             query = self.client.table("jobs").select("*").limit(limit)
             
@@ -107,77 +179,8 @@ class SupabaseConnector:
             response = query.execute()
             return response.data if response.data else []
         except Exception as e:
-            st.error(f"Error fetching jobs: {str(e)}")
+            logging.error(f"Error fetching jobs: {str(e)}")
             return []
-    
-    def get_job_by_id(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a job by its ID.
-        
-        Args:
-            job_id: The job ID
-            
-        Returns:
-            The job data or None if not found
-        """
-        try:
-            response = self.client.table("jobs").select("*").eq("id", job_id).single().execute()
-            return response.data if response.data else None
-        except Exception as e:
-            st.error(f"Error fetching job: {str(e)}")
-            return None
-    
-    def create_job(self, job_data: Dict[str, Any]) -> Union[str, bool]:
-        """
-        Create a new job listing.
-        
-        Args:
-            job_data: The job data to insert
-            
-        Returns:
-            The job ID if successful, False otherwise
-        """
-        try:
-            response = self.client.table("jobs").insert(job_data).execute()
-            return response.data[0]["id"] if response.data else False
-        except Exception as e:
-            st.error(f"Error creating job: {str(e)}")
-            return False
-    
-    def update_job(self, job_id: str, job_data: Dict[str, Any]) -> bool:
-        """
-        Update a job listing.
-        
-        Args:
-            job_id: The job ID
-            job_data: The job data to update
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.client.table("jobs").update(job_data).eq("id", job_id).execute()
-            return True
-        except Exception as e:
-            st.error(f"Error updating job: {str(e)}")
-            return False
-    
-    def delete_job(self, job_id: str) -> bool:
-        """
-        Delete a job listing.
-        
-        Args:
-            job_id: The job ID
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.client.table("jobs").delete().eq("id", job_id).execute()
-            return True
-        except Exception as e:
-            st.error(f"Error deleting job: {str(e)}")
-            return False
     
     # Application operations
     def get_applications_by_user(self, user_id: str) -> List[Dict[str, Any]]:
@@ -190,83 +193,40 @@ class SupabaseConnector:
         Returns:
             List of applications
         """
+        if not self.is_connected():
+            # Return mock data
+            return [
+                {
+                    "job_title": "Senior Full Stack Developer",
+                    "company": "TechNova Inc.",
+                    "applied_date": "2023-02-15",
+                    "status": "Interview Scheduled",
+                    "next_step": "Technical Interview on March 5, 2023"
+                },
+                {
+                    "job_title": "UX/UI Designer",
+                    "company": "CreativeMinds",
+                    "applied_date": "2023-02-10",
+                    "status": "Application Review",
+                    "next_step": "Waiting for feedback"
+                },
+                {
+                    "job_title": "Product Manager",
+                    "company": "InnovateCorp",
+                    "applied_date": "2023-02-01",
+                    "status": "Rejected",
+                    "next_step": "Try other opportunities"
+                }
+            ]
+            
         try:
             response = self.client.table("applications").select("*, jobs(*)").eq("user_id", user_id).execute()
             return response.data if response.data else []
         except Exception as e:
-            st.error(f"Error fetching applications: {str(e)}")
+            logging.error(f"Error fetching applications: {str(e)}")
             return []
-    
-    def get_applications_by_job(self, job_id: str) -> List[Dict[str, Any]]:
-        """
-        Get applications for a job.
-        
-        Args:
-            job_id: The job ID
-            
-        Returns:
-            List of applications
-        """
-        try:
-            response = self.client.table("applications").select("*, profiles(*)").eq("job_id", job_id).execute()
-            return response.data if response.data else []
-        except Exception as e:
-            st.error(f"Error fetching applications: {str(e)}")
-            return []
-    
-    def create_application(self, application_data: Dict[str, Any]) -> bool:
-        """
-        Create a job application.
-        
-        Args:
-            application_data: The application data to insert
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.client.table("applications").insert(application_data).execute()
-            return True
-        except Exception as e:
-            st.error(f"Error creating application: {str(e)}")
-            return False
-    
-    def update_application_status(self, application_id: str, status: str) -> bool:
-        """
-        Update the status of an application.
-        
-        Args:
-            application_id: The application ID
-            status: The new status
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.client.table("applications").update({"status": status}).eq("id", application_id).execute()
-            return True
-        except Exception as e:
-            st.error(f"Error updating application status: {str(e)}")
-            return False
     
     # Company operations
-    def get_company_by_id(self, company_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a company by its ID.
-        
-        Args:
-            company_id: The company ID
-            
-        Returns:
-            The company data or None if not found
-        """
-        try:
-            response = self.client.table("companies").select("*").eq("id", company_id).single().execute()
-            return response.data if response.data else None
-        except Exception as e:
-            st.error(f"Error fetching company: {str(e)}")
-            return None
-    
     def get_companies(self, filters: Optional[Dict[str, Any]] = None, limit: int = 50) -> List[Dict[str, Any]]:
         """
         Get companies with optional filtering.
@@ -278,6 +238,38 @@ class SupabaseConnector:
         Returns:
             List of companies
         """
+        if not self.is_connected():
+            # Return mock data
+            return [
+                {
+                    "name": "TechNova Inc.",
+                    "industry": "Technology",
+                    "location": "San Francisco, USA",
+                    "size": "Medium (201-1000)",
+                    "rating": "4.8/5",
+                    "description": "A leading software development company specializing in enterprise solutions.",
+                    "open_jobs": 15
+                },
+                {
+                    "name": "DataFlow Analytics",
+                    "industry": "Technology",
+                    "location": "New York, USA",
+                    "size": "Small (51-200)",
+                    "rating": "4.6/5",
+                    "description": "Data science and analytics company helping businesses leverage their data.",
+                    "open_jobs": 8
+                },
+                {
+                    "name": "CloudSphere",
+                    "industry": "Technology",
+                    "location": "Seattle, USA",
+                    "size": "Large (1000+)",
+                    "rating": "4.5/5",
+                    "description": "Cloud infrastructure and services provider with global presence.",
+                    "open_jobs": 23
+                }
+            ]
+            
         try:
             query = self.client.table("companies").select("*").limit(limit)
             
@@ -295,83 +287,5 @@ class SupabaseConnector:
             response = query.execute()
             return response.data if response.data else []
         except Exception as e:
-            st.error(f"Error fetching companies: {str(e)}")
+            logging.error(f"Error fetching companies: {str(e)}")
             return []
-    
-    def update_company(self, company_id: str, company_data: Dict[str, Any]) -> bool:
-        """
-        Update a company profile.
-        
-        Args:
-            company_id: The company ID
-            company_data: The company data to update
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.client.table("companies").update(company_data).eq("id", company_id).execute()
-            return True
-        except Exception as e:
-            st.error(f"Error updating company: {str(e)}")
-            return False
-    
-    # Analytics operations
-    def get_job_analytics(self, employer_id: str) -> Dict[str, Any]:
-        """
-        Get analytics data for an employer.
-        
-        Args:
-            employer_id: The employer's ID
-            
-        Returns:
-            Dictionary of analytics data
-        """
-        try:
-            # Count active jobs
-            active_jobs_query = self.client.table("jobs").select("id").eq("employer_id", employer_id).eq("status", "Active").execute()
-            active_jobs_count = len(active_jobs_query.data) if active_jobs_query.data else 0
-            
-            # Count applications
-            applications_query = (
-                self.client.table("applications")
-                .select("id, job_id")
-                .eq("jobs.employer_id", employer_id)
-                .execute()
-            )
-            applications_count = len(applications_query.data) if applications_query.data else 0
-            
-            # Count interview scheduled
-            interviews_query = (
-                self.client.table("applications")
-                .select("id")
-                .eq("jobs.employer_id", employer_id)
-                .eq("status", "Interview Scheduled")
-                .execute()
-            )
-            interviews_count = len(interviews_query.data) if interviews_query.data else 0
-            
-            # Count jobs filled
-            filled_jobs_query = (
-                self.client.table("jobs")
-                .select("id")
-                .eq("employer_id", employer_id)
-                .eq("status", "Filled")
-                .execute()
-            )
-            filled_jobs_count = len(filled_jobs_query.data) if filled_jobs_query.data else 0
-            
-            return {
-                "active_jobs": active_jobs_count,
-                "applications": applications_count,
-                "interviews": interviews_count,
-                "jobs_filled": filled_jobs_count
-            }
-        except Exception as e:
-            st.error(f"Error fetching analytics: {str(e)}")
-            return {
-                "active_jobs": 0,
-                "applications": 0,
-                "interviews": 0,
-                "jobs_filled": 0
-            }
